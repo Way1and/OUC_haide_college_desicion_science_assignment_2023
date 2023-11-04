@@ -7,7 +7,6 @@
 有一个服务员来解决客户在结账过程中遇到的问题...  ( 见 DecSci23_ProgrammingAssignment.pdf )
 
 ### 信息
-- 作者: 杨东旭
 - Author: Way1and
 - Julia version: 1.9.3
 - Date: 2023-11-03
