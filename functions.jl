@@ -51,7 +51,7 @@ end
 
 # event based instrumentation
 function write_state(fid::IO,state::State, event::Event)
-    println(fid, "$(event.id),$(event.customer_id),$(event.at),$(typeof(event)),$(length(state.waiting_queue)),$(length(state.servicing_queue)),$(length(state.problem_queue))")
+    println(fid, "$(event.id),$(event.customer_id),$(event.at),$(typeof(event)),$(length(state.waiting_queue)),$(length(state.servicing_queue) + length(state.problem_queue)),$(length(state.problem_queue))")
 end
 
 # function to create output and run the simulation
