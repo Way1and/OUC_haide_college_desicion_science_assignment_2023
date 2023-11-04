@@ -29,7 +29,6 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Departure)::Customer
     # 出队
     # 这里不能用 service_start_at 因为遇到问题后 出队 顺序变更
     =#
-
     customer, _ = DataStructures.Base.first(S.servicing_queue) 
     delete!(S.servicing_queue, customer)
     waiting_go_service(S, P, R)
@@ -58,10 +57,9 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Problem)::Union{Custo
     
     if length(S.problem_queue) == 0                     
         problem_customer.resolve_start_at = E.at
-    else
-                                   
-        problem_customer.resolve_start_at = E.at - first(S.problem_queue).resolve_start_at + (length(S.problem_queue) - 1) * R.resolution_time() + E.at
-        # 开始解决时间点 = (问题发生时间点 - 第一个问题开始解决时间点)即第一个问题剩余解决时间 + 后续问题解决所需时间段 + 出现问题时间点
+    else                     
+        problem_customer.resolve_start_at = (R.resolution_time() -  (E.at - first(S.problem_queue).resolve_start_at)) + (length(S.problem_queue) - 1) * R.resolution_time() + E.at
+        # 开始解决时间点 = [解决问题需要时间 - (问题发生时间点 - 第一个问题开始解决时间点)]即第一个问题剩余解决时间 + 后续问题解决所需时间段 + 出现问题时间点
     end
 
     enqueue!(S.problem_queue, problem_customer)         # 入队 问题顾客
@@ -72,19 +70,23 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Problem)::Union{Custo
 
     # 入队 问题解决事件
     resolved = Resolved(S.event_count + 1, problem_customer.resolve_start_at + R.resolution_time())
-    resolved.customer_id = problem_customer.id
-    event_push!(S, resolved)        
+    # 问题解决时间点 = 问题解决开始时间点 + 解决问题需要时间
 
+    resolved.customer_id = problem_customer.id
+    event_push!(S, resolved)
      # 循环修改离开事件时间
     for pair in S.event_queue 
         event, _ = pair
         # 顾客ID 相同, 事件是离开类型
         if event.customer_id == problem_customer.id && isa(event, Departure)
+            event.at =  problem_customer.service_end_at - problem_customer.problem_start_at + resolved.at
             # 新的离开时间 = ( 原本顾客结束服务时间点 - 顾客问题出现时间点 ) 即剩余服务时间 + 问题解决的时间点   
-            S.event_queue[event] =  problem_customer.service_end_at - problem_customer.problem_start_at + resolved.at 
+            delete!(S.event_queue, event)  
+            enqueue!(S.event_queue, event => event.at)  # 修改
             break
         end
     end
+
     E.customer_id = resolved.customer_id
     return problem_customer
 end
@@ -93,11 +95,11 @@ end
 # Resolved 问题解决事件
 function update!(S::State, P::Parameters, R::RandomNGs, E::Resolved)::Customer
     S.current_at = E.at
-
     customer = dequeue!(S.problem_queue)  # 出队 问题顾客
-    customer.service_end_at = customer.service_end_at - customer.problem_start_at + E.at  # 计算 新的完成时间
-    enqueue!(S.servicing_queue, customer => customer.service_end_at)  # 入队 服务顾客
 
+    customer.service_end_at = customer.service_end_at - customer.problem_start_at + E.at
+    # 新的完成时间 = (服务结束时间 - 问题出现时间)
+    enqueue!(S.servicing_queue, customer => customer.service_end_at)  # 入队 服务顾客
     E.customer_id = customer.id
     return customer
 end
@@ -120,7 +122,7 @@ end
 function event_push!(S::State, E::Event)
     S.event_count += 1
     E.id = S.event_count
-    enqueue!(S.event_queue, E, E.at)
+    enqueue!(S.event_queue, E => E.at)
 end
 # 不增加事件数
 function event_push!(S::State, E::Problem, event_id::Int64)
