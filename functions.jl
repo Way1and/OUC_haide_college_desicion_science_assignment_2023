@@ -101,7 +101,7 @@ function run!(system::State, P::Parameters, R::RandomNGs, fid_state::IO, fid_ent
     start_ts = time()
    
     # main event loop 
-    problem_unset_count = 0
+    problem_unset_queue = Queue{Problem}()  # 队列 全局待发生的问题
     while system.current_at < P.final_at
         # grab the next event from the event queue
         event = dequeue!(system.event_queue)
@@ -111,20 +111,23 @@ function run!(system::State, P::Parameters, R::RandomNGs, fid_state::IO, fid_ent
         customer = update!(system, P, R, event)
 
         if customer === nothing
-            problem_unset_count += 1 
+            # 保存 该 problem 事件 id
+            enqueue!(problem_unset_queue, event)
             continue    
         end
 
-        # 添加 将来问题事件
-        if isa(event, Union{Arrival, Departure}) 
-            # 写入 实体
+        # 如果 服务队列变化
+        if isa(event, Union{Arrival, Departure, Resolved}) 
+            # 如果是离开 写入 实体
             if isa(event, Departure)
                 write_entity(fid_entities, customer)
             end
-
-            if problem_unset_count != 0
-                event_push!(system, Problem(system.event_count, event.at + eps()), event.id)  # 添加 问题事件
-                problem_unset_count -= 1
+            
+            # 可以加入problem: 系统服务队列有人, 有未设置的问题
+            if length(system.servicing_queue) != 0 && length(problem_unset_queue) != 0
+                problem = dequeue!(problem_unset_queue)  # 出队 等待添加的问题
+                problem.at = event.at + eps()  # 设置很小的时间间隔
+                event_push!(system, problem, problem.id)  # 添加 问题事件 
             end
         end
         
