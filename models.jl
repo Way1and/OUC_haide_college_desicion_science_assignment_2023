@@ -30,7 +30,7 @@ mutable struct Departure <: Event
     customer_id::Union{Nothing,Int64}
     Departure(id::Int64, at::Float64) = new(id, at, nothing)
     Departure(id::Int64, at::Float64, customer_id::Int64) = new(id, at, customer_id)
-
+    
 end
 
 # Problem 顾客遇到问题

@@ -7,4 +7,5 @@ main:
 
 include("./functions.jl")
 P = Parameters(1, 4, 1, 1, 2, 0.5, 30)
+
 run_checkout_sim(P)

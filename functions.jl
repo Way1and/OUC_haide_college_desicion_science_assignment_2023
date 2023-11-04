@@ -15,11 +15,11 @@ function init(P :: Parameters)
     system = State()
     t0 = 0.0
 
-    event_push!(system,  Arrival(system.event_count, t0))
+    event_push!(system,  Arrival(1, t0))
 
     # add a problem at time 4.0
     t1 = 4.0
-    event_push!(system, Problem(system.event_count, t1 ))
+    event_push!(system, Problem(2, t1))
     return (system, R)
     end
 
@@ -105,33 +105,33 @@ function run!(system::State, P::Parameters, R::RandomNGs, fid_state::IO, fid_ent
     while system.current_at < P.final_at
         # grab the next event from the event queue
         event = dequeue!(system.event_queue)
-        println("    $event")
         # update the system based on the next event, and spawn new events. 
         # return arrived/departed customer.
 
         customer = update!(system, P, R, event)
 
-        if customer !== nothing
-            # write out data
-            write_state(fid_state,system, event)
+        if customer === nothing
+            problem_unset_count += 1 
+            continue    
+        end
 
-            # 添加 将来问题事件
-            if isa(event, Union{Arrival, Departure}) 
-                # 写入 实体
-                if isa(event, Departure)
-                    write_entity(fid_entities, customer)
-                end
-
-                if problem_unset_count != 0
-                    event_push!(system, Problem(system.event_count, event.at + eps()))  # 添加 问题事件
-                    problem_unset_count -= 1
-                end
+        # 添加 将来问题事件
+        if isa(event, Union{Arrival, Departure}) 
+            # 写入 实体
+            if isa(event, Departure)
+                write_entity(fid_entities, customer)
             end
 
-            # note that we are writing out the state AFTER each ARRIVAL 
-            else
-                problem_unset_count += 1
+            if problem_unset_count != 0
+                event_push!(system, Problem(system.event_count, event.at + eps()), event.id)  # 添加 问题事件
+                problem_unset_count -= 1
             end
+        end
+        
+        # write out data
+        write_state(fid_state,system, event)
+        println("    $event")
+        # note that we are writing out the state AFTER each ARRIVAL
     end
    print_info_end(system, start_ts)
 end
@@ -153,7 +153,7 @@ end
 function print_info_start(S ::State, P ::Parameters)
        
     println("
-    \nsimulation start.
+    \nSimulation Start.
     conditions: $P
     ")
 

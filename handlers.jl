@@ -15,6 +15,8 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Arrival)::Customer
     next_arrival = get_next_arrival(S, R)                                      # 生成 下次抵达事件
     event_push!(S, next_arrival)                                             # 入队
     waiting_go_service(S, P, R)                                             # 推进 队列
+
+    E.customer_id = customer.id
     return customer
 end
 
@@ -32,6 +34,7 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Departure)::Customer
     delete!(S.servicing_queue, customer)
     waiting_go_service(S, P, R)
     
+    E.customer_id = customer.id
     return customer
 end
 
@@ -82,6 +85,7 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Problem)::Union{Custo
             break
         end
     end
+    E.customer_id = resolved.customer_id
     return problem_customer
 end
 
@@ -93,6 +97,8 @@ function update!(S::State, P::Parameters, R::RandomNGs, E::Resolved)::Customer
     customer = dequeue!(S.problem_queue)  # 出队 问题顾客
     customer.service_end_at = customer.service_end_at - customer.problem_start_at + E.at  # 计算 新的完成时间
     enqueue!(S.servicing_queue, customer => customer.service_end_at)  # 入队 服务顾客
+
+    E.customer_id = customer.id
     return customer
 end
 
@@ -105,7 +111,7 @@ function waiting_go_service(S::State, P::Parameters, R::RandomNGs)
         customer.service_start_at = S.current_at                            # 设置 服务开始时间
         customer.service_end_at = R.service_time() + S.current_at           # 随机 服务结束时间
 
-        event_push!(S, Departure(S.event_count, customer.service_end_at, customer.id))    # 入队 顾客离开事件
+        event_push!(S, Departure(0, customer.service_end_at, customer.id))    # 入队 顾客离开事件
         enqueue!(S.servicing_queue, customer => customer.service_end_at)                 # 入队 服务顾客队列
     end
 end
@@ -113,6 +119,12 @@ end
 # event_push 通用 添加事件
 function event_push!(S::State, E::Event)
     S.event_count += 1
+    E.id = S.event_count
+    enqueue!(S.event_queue, E, E.at)
+end
+# 不增加事件数
+function event_push!(S::State, E::Problem, event_id::Int64)
+    E.id = event_id
     enqueue!(S.event_queue, E, E.at)
 end
 
@@ -125,5 +137,5 @@ end
 # get_next_arrival 下次到达事件
 function get_next_arrival(S::State, R::RandomNGs)::Arrival
     next_arrival_at = S.current_at + R.interarrival_time()
-    return Arrival(S.event_count + 1, next_arrival_at)
+    return Arrival(0, next_arrival_at)
 end
