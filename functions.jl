@@ -45,8 +45,7 @@ end
 # functions to write output
 # entity based instrumentation
 function write_entity(fid::IO, customer::Customer)
-    service_time = customer.service_end_at - customer.service_start_at
-    println(fid, "$(customer.id),$(customer.arrival_at),$(service_time),$(customer.service_end_at),$(customer.problem_count)")
+    println(fid, "$(customer.id),$(customer.arrival_at),$(customer.service_start_at),$(customer.service_end_at),$(customer.problem_count)")
 end
 
 # event based instrumentation
